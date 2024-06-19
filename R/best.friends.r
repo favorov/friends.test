@@ -1,48 +1,82 @@
-#' best.friends: A package that describe wheteher a community is a best friend (or one of the best friends) for its member. 
 #'
-#' We have a list of intersecting communities, and the membership of all the elements is represened by real value. 
-#' It can be a fuzzy inclusion or, maybe, different status of members in a  communities. The absence of a relation (E is not a member of C at all)
-#' is supposed to be represented by the smallest value, naturally, it is 0 and all the memberships are positive. 
-#' The membership is a ExC matrix.
+#' best.friends
 #' 
-#' We want to find the community that specifically prefers an element.
-#' We say that the community are  friendly to the elements. The simplest: suppose an element that is mebmer of only one community. 
-#' The member is a marker for the community (if we see him, all the community is around) and the community is friendly to him (all others do not like him).
-#' We say that the community is a friend (or best friend) of an element if it prefers the element more than other commities do and the difference is unlikely to be at random.
-#'
-#' @section best.friends functions:
-#' [best.friends.test] takes the elements x communities matrix, and for each element provides the community that is the potential best friend of the element and the corresponding p-value. The p-value is about the null hypothesis that the difference between the best and the next ranks of the element in communities a result of randomess. If p-value is low and the null is rejected, the community is the best friend of the element and the element is the community marker.
-#'
-#'
-#' [friends.test] does the same, but it considers n (possibly, all) the communities as potential friends for each member, and p-values are generated for each element+community pair. The p-values tests the null hyposthesis that claims that the differnce of the elements's ranks in this community and in the next-by-member-rank-of-the-element community is by random. If p-value is low and the null is rejected, the element reliably separates the comumities.
-#'
-#' @docType package
-#' @name best.friends
-#' @importFrom utils packageDescription
-#' @importFrom data.table frankv
-#' @useDynLib best.friends, .registration = TRUE
-#' @importFrom Rcpp evalCpp
-# these two are Rcpp - specific ivocations
-#' @examples
-#' genes<-10
-#' regulation=matrix(
-#'   c(0.2, 0.2, 0.2, 0.2, 0.25, rep(0.2,genes-5),
-#'     rep(1, genes),
-#'     rep(1, genes),
-#'     rep(1, genes),
-#'     rep(1, genes),
-#'     rep(1, genes),
-#'     rep(1, genes),
-#'     rep(1, genes),
-#'     rep(1, genes),
-#'     rep(1, genes)
-#'   ),
-#'   ncol=10,byrow=FALSE
-#' )
-#' gene.names<-LETTERS[seq( from = 1, to = genes )]
-#' TF.names<-c('TF1','TF2','TF3','TF4','TF5','TF6','TF7','TF8','TF9','TF10')
-#' rownames(regulation)<-gene.names
-#' colnames(regulation)<-TF.names
-#' bfriends<-best.friends.test(regulation)
-#' friends<-friends.test(regulation)
-NULL
+#' Find Tags that are best friends to Collections
+#' 
+#' @param attention original attention matrix
+#' @param threshold The adjusted p-value threshold for KS test for 
+#' non-uniformity of ranks.
+#' @param p.adjust.method Multiple testing correction method, see \link[stats]{p.adjust}.
+#' @param best.no The maximum number of friends for a tag, the default is \code{1}, 
+#' i.e. the best friend. The string "all" means "all friends".
+#' @return A data those of tags and collections that are markers and best friends 
+#' friends.
+#' @importFrom stats p.adjust
+#' @examples 
+#' attention <- matrix(c(10,6,7,8,9,
+#'                 9,10,6,7,8,
+#'                 8,9,10,6,7,
+#'                 7,8,9,10,6,
+#'                 6,7,8,9,10,
+#'                 20,0,0,0,0), 
+#'                 nrow=6, ncol=5, byrow=TRUE)
+#' res <- best.friends(attention, threshold = .25)
+#' @export
+#' 
+best.friends <- function(attention=NULL, threshold = 0.05, 
+                         p.adjust.method = "BH", best.no = 1) {
+  #parameter checks
+  if (is.na(best.no) || best.no == "all" ||
+      best.no == "al" || best.no == "a" ||
+      is.null(best.no) || !as.logical(best.no)){
+    best.no = nrow(attention)
+  }
+  if(best.no < 1 || best.no > nrow(attention)) {
+    stop("best.no must be at between 1 and the number of tags.")
+  }
+  if(threshold < 0 || threshold > 1) {
+    stop("threshold must be between 0 and 1.")
+  }
+  if(is.null(dimnames(attention))) {
+    dimnames(attention) <- list(1:nrow(attention), 1:ncol(attention))
+  }
+  #find tags with non-uniform ranks
+  all_ranks <- tag.int.ranks(attention)
+  adj_nunif_pval <- p.adjust(
+      apply(all_ranks, 1, unif.ks.test),
+      method = p.adjust.method)
+
+  marker_ranks <- all_ranks[adj_nunif_pval<=threshold,,drop=FALSE]
+
+  if(nrow(marker_ranks) == 0) {
+    message("No tags with non-uniform ranks found for given threshold.")
+    return(data.frame(tag=character(), collection=character()))
+  }
+
+
+  #find friends that make tag ranks non-uniform
+  tag_count <- dim(attention)[1]
+
+  all_friends <- apply(marker_ranks, 1,
+                       function(x) best.step.fit(x, tags.no = tag_count))
+
+  #best friends are cases where a tag is a marker in only best.no collections
+  best_friends <- all_friends[sapply(all_friends, function(x) {
+    x$population.on.left <= best.no
+    })]
+  
+  
+  if(!length(best_friends)){
+    return(data.frame(tag=character(), collection=character()))
+  } #uf no tag passed best test, return empty frame rather than NULL
+
+  res_pre <- lapply(seq_along(best_friends), function(x) {
+    data.frame(
+       tag=names(best_friends[x]),
+       collection=colnames(marker_ranks)[best_friends[[x]]$collections.on.left]
+     )})
+
+  res <- do.call(rbind, res_pre)
+
+  res
+}

@@ -1,0 +1,9 @@
+# ignore R created files
+.Rprofile
+.Rhistory
+*.Rcheck
+best.friends_*.tar.gz
+
+# ignore OS X files
+*.DS_Store
+.Rproj.user
