@@ -1,16 +1,20 @@
 ---
 title: "Best friends: what collection is friendly to this tag? Is it actually friendly?"
-output: rmarkdown::html_vignette
+output: 
+  html_vignette:
 vignette: >
  %\VignetteIndexEntry{Best friends: what collection is friendly to this tag? Is it actually friendly?}
  %\VignetteEngine{knitr::rmarkdown}
  %\VignetteEncoding{UTF-8}
  %\VignetteDepends{devtools}
 ---
+<!--  tried below html_vignette, did no work
+      theme: Bootstrap
+      toc: true
+      toc_depth: 2 -->
+
 
 [SI AUGUSTUS CERNATUR, CERNANTUR QOUQUE AMICI]{style="float:right"}
-
-##
 
 `r format(Sys.Date(), "%d %b %Y")` 
 
@@ -19,12 +23,13 @@ vignette: >
 `r library(best.friends)`
 `r options(width=80,keep.source=TRUE)`
 `r opts_chunk$set(echo=TRUE,message=FALSE,cache=FALSE,warning=FALSE)`
+`r set.seed(42)`
 <!-- cache is off, we save all the necessary things in Rda -->
 
 <div style="line-height: 1.5em;">
 
-## Introduction
 
+# Introduction
 There is a simple intuition of what it means to be a friend. A friend of Augustus cares about Augustus more than about other people. And, if we see Augustus, then we infer to see friends(s) of Augustus also. Let’s translate it into statistical language.
 
 Consider a set of genes and their loads in a set of expression patterns. Each pattern represents a biological process by the expression levels of the involved genes. 
@@ -32,9 +37,9 @@ Consider a set of genes and their loads in a set of expression patterns. Each pa
 Sometimes, the expression of a single gene indicates the activity of the entire pattern. In the simplest case, the gene has a nonzero load in only one pattern. 
 Moreover, the gene may have several nonzero loads, but all of them but one are relatively small. Then the gene (AKA Augustus) is the marker gene for the pattern, and the marked pattern is the best friend of this gene. We want to identify the marker genes and corresponding patterns statistically.  
 
-\paragraph{Model} The bipartite graph naturally fits this model. To generalise the example, we will refer to genes as \textit{{\tag}s}, to expression patterns, as \textit{{\collection}s}, and to any load as \textit{attention}. The sketch below illustrates the setting.
+\paragraph{Model} The bipartite graph naturally fits this model. To generalise the example, we will refer to genes as \textit{{\tag}s}, and to expression patterns, as \textit{{\collection}s}, and to any load as \textit{attention}. The sketch below illustrates the setting.
 
-![The bipartite graph picture shows only edges with nonzero values](bipartite.jpg){width=50%}
+![The bipartite graph picture shows only edges with nonzero values](bipartite.png){width=25%}
 
 To be more specific, we are given a set of collections $C = \{c_1, \dots, c_k\}$, and a set of tags $T = \{t_1, \dots, t_n\}$.
 Each tag $t \in T$ and collection $c \in C$ are related by the attention $A(t, c)$, that the cloud pays to the tag. The strength of attention varies from $0$ to infinity, $A(t, c)\ge 0$. 
@@ -63,128 +68,72 @@ The main idea of the test is that if a tag $t_i$ is now preferred by any collect
 
 Please see our manuscript [] for more details.
 
-## Code and examples in R
 
+## Toy example: Bayesian option
 ```{r source, echo=FALSE}
 data.digits=2
 p.val.digits=4
 ```
 </div>
 
-### Toy example
 
-Let's start with something supersimple.
-
-```{r}
-relation<-matrix(ncol = 3,nrow=7)
-rownames(relation)<-c("Tag1","Tag2","Tag3","Tag4","Tag5","Tag6","Tag7")
-colnames(relation)<-c("Collection1","Collection2","Collection3")
-relation[1,]<-c(0.2,0.1,0.3)
-relation[2,]<-c(2,3,1)
-relation[3,]<-c(0.1, 6 ,0.05 )
-relation[4,]<-c(0.4, 1 ,3 )
-relation[5,]<-c(0.25,0.15 ,0.3 )
-relation[6,]<-c(2,0.9 ,0.4 )
-relation[7,]<-c(.7,0.1 ,11 )
-noquote(relation)
-```
-Now, rank
-```{r}
-tag.ranks<-tag.int.ranks(relation)
-noquote(format(relation))
-```
-Cloud 2 is the best friend of tag 3, and it is the only result with p-value less than 0.05. Makes sense. Tag 3 is the best for the collection 2, while it is the worst for other two collections.
-
-### <a name="toyTF"></a> Toy regulation example
-
-Let's return to the regulation example. We have ten TFs (TF1, TF2, ..) and ten genes (A,B,...) The strength of the regulation is shown by the matrix. The tags are genes, the collections are derived from their regulation by TFs.
+Let's illustrate the method with something supersimple.
 
 ```{r}
-genes<-10
-regulation=matrix(
-    c(0.2, 0.2, 0.2, 0.2, 0.25, rep(0.2,genes-5),
-      rep(1, genes),
-        rep(1, genes),
-        rep(1, genes),
-        rep(1, genes),
-        rep(1, genes),
-        rep(1, genes),
-        rep(1, genes),
-        rep(1, genes),
-        rep(1, genes)
-    ),
-    ncol=10,byrow=FALSE
-)
-gene.names<-LETTERS[seq( from = 1, to = genes )]
-TF.names<-c('TF1','TF2','TF3','TF4','TF5','TF6','TF7','TF8','TF9','TF10')
-rownames(regulation)<-gene.names
-colnames(regulation)<-TF.names
+regulation<-structure(c(
+  0.2, 0.25, 0.1, 0.23, 0.3, 0.12, 0.14, 
+  4, 3, 6, 1, 9, 7, 10, 
+  3, 1, 5, 6, 3, 4, 11), 
+  dim = c(7, 3), 
+  dimnames = list(
+    c("Gene1", "Gene2", "Gene3", 
+      "Gene4", "Gene5", "Gene6", "Gene7"), 
+    c("TF1", "TF2", "TF3")))
+noquote(regulation)
 ```
-So, we prepared the relation matrix.
+What we want to identify is Gene2-TF1 pair. Gene2 is not the strongest downstream gene in the TF1 collection (column), it is only the second, but, on the other hand its rank in other TF-based collections is much lower.
+
+First, let's apply the Bayesian version of the method, `best.friends.bic`.
 
 ```{r}
-noquote(format(regulation,digits = data.digits))
-```
-Tags (genes) are rows, collections (TFs) are columns, it is consistent with $A\left(t,c\right)$ notation.
-
-Searching for the best friend TF for each gene:
-
-
-Only gene E (the fifth) has a reliable best friend, and it is TF1. It is what we could see in the relation matrix, so what we calculate here is consistent with the intuition.
-
-
-Again, only gene E (the fifth) has a reliable best friend, and it is TF1.
-It is interesting to see that the tenth (worst) rank of all the genes is unexpectedly far away from 1 (the right column). It is an effect of ties, the worst ranks of all the genes but E but E are 5.5 and E is 6.
-
-Add some randomness to the equal columns:
-```{r}
-set.seed(42)
-regulation<-jitter(regulation)
-noquote(format(regulation,digits = data.digits))
+best.friends.bic(regulation,prior.to.have.friends = .5)
 ```
 
-And, let's search for best friends again:
+We see the expected Gene2-TF1 pair as well as the Gene1-TF1 pair, that is similar to the expected, Gene1 has rank of 3 in the TF1 collection.
 
-Almost all the effects disappear. There is some week signal for gene E is for {TF1,TF9,TF7,TF10} 
-
-
-
-### <a name="toynet"></a> Toy net example
-
-![Toy network example](green-6.png)
-
-Let's represent the graph on the picture by its weighted adjacency matrix. The diagonal tags are NAs.
+The lower is the prior to have friends for a tag (it is an obligatory parameter for `best.friends.bic`), the less marker-friend pairs we get.
 
 ```{r}
-connections<-matrix(nrow = 10,ncol=10,0)
-names<-c('red','purple','blue','orange','green.1','green.2','green.3','green.4','green.5','green.6')
-rownames(connections)<-names
-colnames(connections)<-names
-connections[,'red']<-5
-connections['red',]<-5
-connections['orange','red']<-0
-connections['red','orange']<-0
-connections['blue','orange']<-3
-connections['orange','blue']<-3
-connections['purple','blue']<-1
-connections['blue','purple']<-1
-diag(connections)=NA
-noquote(format(connections,digits = data.digits))
+best.friends.bic(regulation,prior.to.have.friends = .33)
 ```
-Let's search for best friends (here, the diagonal is neglected by the construstion, and we let the test know it):
 
-` ` `{r}
-friends<-best.friends.test(connections,neglect_diagonal = TRUE)
-noquote(format(friends,digits = p.val.digits))
+```{r}
+best.friends.bic(regulation,prior.to.have.friends = .25)
+```
 
-` ` `
-the blue is the best friend for the orange .
+In all the three examples above, the `best.no` parameter was 1 by default. It means that the function filters out all the tags that have more that one friendly collection. If we relax the restriction, we get:
 
+```{r}
+best.friends.bic(regulation,prior.to.have.friends = .5, best.no = "all")
+best.friends.bic(regulation,prior.to.have.friends = .33, best.no = "all")
+best.friends.bic(regulation,prior.to.have.friends = .25, best.no = "all")
+```
 
-`. ` `
-The same friendship: the blue is the best friend for the orange (uncorrected p-value='r noquote(format(all.friends$pvals[4,1],digits = p.val.digits))'). All the nodes but the red are better friends for the the orange than the red is (uncorrected p-value='r noquote(format(all.friends$pvals[4,8],digits = p.val.digits))`).  All the nodes but the orange are better friends for the the red than the orange is (uncorrected p-value='r noquote(format(all.friends$pvals[1,8],digits = p.val.digits))').
+## The same toy example: default option
 
-Session info to match stadadrds:
+Let's run the p-value-based option of the method on the same data. It is less sensitive on small dataset, so we use unpractical threshold for the p-value to see the result.
+
+```{r}
+best.friends(regulation,threshold = .5,p.adjust.method = "no")
+```
+
+Amd, again, if we relax the `best.no` restriction, we will see more pairs, but now the friends are not required to be unique for a marker.
+
+```{r}
+best.friends(regulation,threshold = .5,p.adjust.method = "no",best.no = "all")
+```
+
+## Session info
 ```{r}
 sessionInfo()
 ```
