@@ -2,7 +2,7 @@ test_that("no errors in simplest case",{
     mat <- diag(nrow=5, ncol=5)
     rownames(mat) <- paste0("tag",1:5)
     colnames(mat) <- paste0("coll",1:5)
-    expect_no_error(best.friends(mat))
+    expect_no_error(friends.test(mat))
 })
 
 test_that("best friend is determined correctly",{
@@ -14,10 +14,11 @@ test_that("best friend is determined correctly",{
             tag5 0.0000000 0.0000000 0.0000000 0.00000000 1.0000000"
     attention <- as.matrix(read.table(text=text, header=TRUE))
     
-    expect_equivalent(best.friends(attention),
-                data.frame(tag=c("tag5"),
-                           collection=c("coll5")))
-
+    friends<-friends.test(attention)
+    expect_equivalent(dim(friends),c(1,3))
+    expect_equivalent(friends$marker,c("tag5"))
+    expect_equivalent(friends$friend,c("coll5"))
+    expect_equivalent(friends$friend.rank,c(1))
 })
 
 
@@ -32,8 +33,9 @@ test_that("passes non-diagonal diagonal test",{
   diag(almost_diagon_mat) <- 19
   rownames(almost_diagon_mat) <- paste0("tag",1:ntags)
   colnames(almost_diagon_mat) <- paste0("coll",1:ncolls)
-  res <- best.friends(almost_diagon_mat)
-  expect_equivalent(res,
-                    data.frame(tag=paste0(c("tag"),1:ncolls),
-                               collection=paste0(c("coll"),1:ncolls)))
+  friends <- friends.test(almost_diagon_mat)
+  expect_equivalent(dim(friends),c(ncolls,3))
+  expect_equivalent(friends$marker,paste0(c("tag"),1:ncolls))
+  expect_equivalent(friends$friend,paste0(c("coll"),1:ncolls))
+  expect_equivalent(friends$friend.rank,rep(1,ncolls))
 })

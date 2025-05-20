@@ -2,7 +2,7 @@ test_that("no errors in simplest case",{
     mat <- diag(nrow=5, ncol=5)
     rownames(mat) <- paste0("tag",1:5)
     colnames(mat) <- paste0("coll",1:5)
-    expect_no_error(best.friends.bic(mat,.5))
+    expect_no_error(friends.test.bic(mat,.5))
 })
 
 test_that("best friend is determined correctly",{
@@ -14,13 +14,17 @@ test_that("best friend is determined correctly",{
             tag5 0.0000000 0.0000000 0.0000000 0.00000000 1.0000000"
     attention <- as.matrix(read.table(text=text, header=TRUE))
     
-    expect_equivalent(best.friends.bic(attention,.25),
-                      data.frame(tag=c("tag5"),
-                                 collection=c("coll5")))    
-    expect_equivalent(best.friends.bic(attention,.5),
-                      data.frame(tag=c("tag3","tag5"),
-                                 collection=c("coll4","coll5")))    
+    friends<-friends.test.bic(attention,.25,max.friends.n=1)
+    expect_equivalent(dim(friends),c(1,3))
+    expect_equivalent(friends$marker,c("tag5"))
+    expect_equivalent(friends$friend,c("coll5"))
+    expect_equivalent(friends$friend.rank,c(1))
     
+    friends<-friends.test.bic(attention,.5,max.friends.n=1)
+    expect_equivalent(dim(friends),c(2,3))
+    expect_equivalent(friends$marker,c("tag3","tag5"))
+    expect_equivalent(friends$friend,c("coll4","coll5"))
+    expect_equivalent(friends$friend.rank,c(1,1))
 })
 
 #best.friends method is not illustrated well using square diagonal matrices
@@ -33,18 +37,19 @@ almost_diagon_mat[1:ncolls,] <- runif(ncolls*ncolls)
 diag(almost_diagon_mat) <- 19
 rownames(almost_diagon_mat) <- paste0("tag",1:ntags)
 colnames(almost_diagon_mat) <- paste0("coll",1:ncolls)
-probe<-data.frame(tag=paste0(c("tag"),1:ncolls),
-           collection=paste0(c("coll"),1:ncolls))
+probe<-data.frame(marker=paste0(c("tag"),1:ncolls),
+           friend=paste0(c("coll"),1:ncolls),
+           friend.rank=rep(1,ncolls))
 
 
 test_that("passes non-diagonal diagonal test with low prior to have friend",{
-  res <- best.friends.bic(almost_diagon_mat,.001)
+  res <- friends.test.bic(almost_diagon_mat,.001)
   expect_equivalent(res,probe)
 })
 
 test_that("passes non-diagonal diagonal test with high prior to have friend",{
-  res <- best.friends.bic(almost_diagon_mat,.5)
-  expect_equivalent(left_join(probe,res),probe)
+  res <- friends.test.bic(almost_diagon_mat,.5)
+  expect_equivalent(dplyr::left_join(probe,res),probe)
   #we test that probe is contained in res
 })
 

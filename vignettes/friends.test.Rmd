@@ -1,0 +1,135 @@
+---
+title: "In a matrix, we look for columns that are friendly to a row"
+output: 
+  html_vignette:
+vignette: >
+ %\VignetteIndexEntry{In a matrix, we look for columns that are friendly to a row}
+ %\VignetteEngine{knitr::rmarkdown}
+ %\VignetteEncoding{UTF-8}
+ %\VignetteDepends{devtools}
+---
+<!--  tried below html_vignette, did no work
+      theme: Bootstrap
+      toc: true
+      toc_depth: 2 -->
+
+
+[SI AUGUSTUS CERNATUR, CERNANTUR QOUQUE AMICI]{style="float:right"}
+
+`r format(Sys.Date(), "%d %b %Y")` 
+
+`r library(knitr)`
+`r library(markdown)`
+`r library(friends.test)`
+`r options(width=80,keep.source=TRUE)`
+`r opts_chunk$set(echo=TRUE,message=FALSE,cache=FALSE,warning=FALSE)`
+`r set.seed(42)`
+<!-- cache is off, we save all the necessary things in Rda -->
+
+<div style="line-height: 1.5em;">
+
+
+# Introduction
+There is a simple intuition of what it means to be a friend. A friend of Augustus cares about Augustus more than about other people. And, if we see Augustus, then we infer to see friends(s) of Augustus also. Let’s translate it into statistical language.
+
+Consider a set of genes and their loads in a set of expression patterns. Each pattern represents a biological process by the expression levels of the involved genes. 
+
+Sometimes, the expression of a single gene indicates the activity of the entire pattern. In the simplest case, the gene has a nonzero load in only one pattern. 
+Moreover, the gene may have several nonzero loads, but all of them but one are relatively small. Then the gene (AKA Augustus) is the marker gene for the pattern, and the marked pattern is the best friend of this gene. We want to identify the marker genes and corresponding patterns computationaly.  
+
+\paragraph{Model} 
+
+We have two sets:T (rows) and C (columns) and A real matrix A(t,c) that describes the strength of association between each t and each c; t is an element of T and c is an element of C. 
+For each t we want to identify whether it is significantly more relevant for some c's than for the remaining c's. If it does, those c for which the t is relevant, are the t's friend. And, the t is the c's marker.
+
+The model applies to many problems in bioinformatics and statistics.
+
+        Example                           $\left\{T\right\}$  $\left\{C\right\}$                    $A\left(t,c\right)$
+--------------------------------------    -------------     ----------------------------------  ----------------------------
+[gene regulation by TFs](#toyTF)          gene              genes under the TF regulation       strength of regulation
+[transctironal correlations](#toynet)     gene              genes coexpressed with a gene       transcription correlation
+fuzzy clustering                          object            cluster                             object weight in cluster
+transcription decomposition               transcript        transcription pattern               transcript's load in pattern
+weighted graph                            vertex            another vertex                      weight of edge between collection and tag
+--------------------------------------    -------------     ----------------------------------  ----------------------------
+
+
+
+\paragraph{Goal} For each row, we want to identify whather there are columns(s) that particularly prefer(s) the row, and list the columns. Then such a column is a friend (or the best friend if there is only one) for the row. The simplest example: imagine that for a row, only one column is associated with it. We intend to express the meaning of the word "particularly" in this context by a statistical test.
+
+Let's denote the rank of the $i$-th rows's attention association with $j$-the column inside the column, or, in our notation, the rank of $A_{ij}$ in $A_{*j}$ column, as $r(t_i,c_j)$. 
+
+The main idea of the test is that if a row $t_i$ is not preferred by any collection(s), the distribution of the ranks of the row in all the collections $r(t_i,c_j)$ behaves like $j$  i.i.d integers that are uniformely distributed in $1..n$
+
+
+Please see our manuscript [] for more details.
+
+
+## Toy example: Bayesian option
+```{r source, echo=FALSE}
+data.digits=2
+p.val.digits=4
+```
+</div>
+
+
+Let's illustrate the method with something supersimple.
+
+```{r}
+regulation<-structure(c(
+  0.2, 0.25, 0.1, 0.23, 0.3, 0.12, 0.14, 
+  4, 3, 6, 1, 9, 7, 10, 
+  3, 1, 5, 6, 3, 4, 11), 
+  dim = c(7, 3), 
+  dimnames = list(
+    c("Gene1", "Gene2", "Gene3", 
+      "Gene4", "Gene5", "Gene6", "Gene7"), 
+    c("TF1", "TF2", "TF3")))
+noquote(regulation)
+```
+What we want to identify is Gene2-TF1 pair. Gene2 is not the strongest downstream gene in the TF1 collection (column), it is only the second, but, on the other hand its rank in other TF-based collections is much lower.
+
+First, let's apply the Bayesian version of the method, `best.friends.bic`.
+
+```{r}
+friends.test.bic(regulation,prior.to.have.friends = .5,max.friends.n = 1)
+```
+
+We see the expected Gene2-TF1 pair as well as the Gene1-TF1 pair, that is similar to the expected, Gene1 has rank of 3 in the TF1 collection.
+
+The lower is the prior to have friends for a tag (it is an obligatory parameter for `friends.test.bic`), the less marker-friend pairs we get. 
+
+```{r}
+friends.test.bic(regulation,prior.to.have.friends = .33,max.friends.n = 1)
+
+friends.test.bic(regulation,prior.to.have.friends = .25,max.friends.n = 1)
+```
+
+In all the three examples above, the `max.friends.n` parameter was set to 1. It means that the function filters out all the tags that have more that one friendly collection, or in other words, we look only for the best friends. If we relax the restriction, we get:
+
+```{r}
+friends.test.bic(regulation,prior.to.have.friends = .5, max.friends.n = "all")
+friends.test.bic(regulation,prior.to.have.friends = .33, max.friends.n  = "all")
+friends.test.bic(regulation,prior.to.have.friends = .25, max.friends.n = "all")
+```
+
+Note that `max.friends.n = "all"` is the default value for both `friends.test` (see below) and `friends.test.bic`.
+
+## The same toy example: the KS option
+
+Let's run the p-value-based option of the method on the same data. It is less sensitive on small dataset, so we use unpractical threshold for the p-value to see the result.
+
+```{r}
+friends.test(regulation,threshold = .5,p.adjust.method = "no",max.friends.n = 1)
+```
+
+And, again, if we relax the `max.friends.no` restriction, we will see more pairs, but now the friends are not required to be unique for a marker.
+
+```{r}
+friends.test(regulation,threshold = .5,p.adjust.method = "no")
+```
+
+## Session info
+```{r}
+sessionInfo()
+```
