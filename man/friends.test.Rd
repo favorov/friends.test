@@ -8,8 +8,10 @@ friends.test(
   A = NULL,
   threshold = 0.05,
   p.adjust.method = "BH",
-  max.friends.n = "all",
-  uniform.max = "m"
+  max.friends.n = dim(A)[2]\%/\%2,
+  uniform.max = "m",
+  simulate.p.value = FALSE,
+  B = 2000
 )
 }
 \arguments{
@@ -22,21 +24,29 @@ non-uniformity of ranks.}
 see \link[stats]{p.adjust}.}
 
 \item{max.friends.n}{The maximal number of friends for a marker, the default
-is \code{'all'}, that is an alias for #of columns in A.
+is \code{dim(A)[2]\%/\%2}, that is rounded half of #of columns in A.
 The string "all" means "all friends", i.e. we do not filter by this parameter
 value. A value $n$ means that we filter out a row if it has more
 than $n$ friendly columns. 1 means we look only for unuque (best) friends.}
 
 \item{uniform.max}{The maximum of the uniform distribution of the ranks we
-fit the null model, it can be the maximal possible rank that is common for all
-rows and equals the number of rows \code{'c'} or the maximal observed rank
-for the row we test now, \code{'m'} (default).}
+fit the null model, it can be the maximal possible rank that is common for
+all rows and equals the number of rows \code{'c'} or the maximal observed
+rank for the row we test now, \code{'m'} (default).}
+
+\item{simulate.p.value}{K-S by Monte-Carlo if \code{TRUE};
+default is \code{FALSE}, see \code{\link[stats:ks.test]{stats::ks.test()}}}
+
+\item{B}{number of or replicates if \code{simulate.p.value=TRUE}
+default is 2000, see \code{\link[stats:ks.test]{stats::ks.test()}}}
 }
 \value{
-A data.frame, rows are pairs of markers and friends,
-columns are: marker, friend and friend.rank. The latter is
-the rank of the column-friend in the vector of ranks of the
-ranks of the row-marker in different columns.
+A data.frame, each row describe a pair of a marker and a
+friend. Columns are: marker, friend, marker.index, friend.index and
+friend.rank. Marker and friend are the names of the row and column
+respectively. Indices are their indices in the input matrix.
+The friend.ran is the rank of the column-friend in
+the vector of ranks of the ranks of the row-marker in different columns.
 }
 \description{
 We have two sets:T (rows) and C (columns) and
@@ -53,7 +63,7 @@ A <- matrix(c(10,6,7,8,9,
                 8,9,10,6,7,
                 7,8,9,10,6,
                 6,7,8,9,10,
-                20,0,0,0,0), 
+                20,0,0,0,0),
                 nrow=6, ncol=5, byrow=TRUE)
 A
 friends.test(A, threshold = .05)

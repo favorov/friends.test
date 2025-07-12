@@ -1,8 +1,8 @@
 Package: friends.test
 Type: Package
 Title: In a matrix, we look for columns that are friendly to a row
-Version: 0.99.16
-Date: 2025-05-20
+Version: 0.99.17
+Date: 2025-06-11
 Encoding: UTF-8
 Authors@R: c(
     person("Alexandra","Suvorikova",email = "a.suvorikova@gmail.com",role=c("aut","ctb")),
@@ -22,7 +22,7 @@ Description: We have two sets:T (rows) and C (columns) and
     are the t's friend. And, the t is the c's marker.
 License: Artistic-2.0
 LazyLoad: yes
-Depends: R (>= 4.4.0)
+Depends: R (>= 4.2.0)
 biocViews: Annotation, StatisticalMethod
 URL: https://github.com/favorov/best-friends
 BugReports: https://github.com/favorov/best-friends/issues
