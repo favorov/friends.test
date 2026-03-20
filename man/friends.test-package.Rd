@@ -12,16 +12,16 @@ For each t we want to identify whether it is significantly more
 relevant for some c's than for the remaining c's.
 If it does, those c for which the t is relevant,
 are the t's friend. And, the t is the c's marker.
-For each tag, we want to identify the column(s) that specifically prefer(s)
-the tag. We say that such a column is a friend (or the best friend if it is
-the only) for the tag.
-The simplest example: imagine that only one column pays attention to our tag.
+For each row, we want to identify the column(s) that specifically prefer(s)
+the row. We say that such a column is a friend (or the best friend if it is
+the only) for the row.
+The simplest example: imagine that only one column pays attention to our row.
 }
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/favorov/best-friends}
-  \item Report bugs at \url{https://github.com/favorov/best-friends/issues}
+  \item \url{https://github.com/favorov/friends.test}
+  \item Report bugs at \url{https://github.com/favorov/friends.test/issues}
 }
 
 }
@@ -35,6 +35,7 @@ Authors:
   \item Dmitrijs Lvovs \email{dmitrijs.lvovs@gmail.com} [contributor]
   \item Vera Mukhina \email{atgc@vigg.ru} [contributor]
   \item Andrey A. Mironov \email{mironov@bioinf.fbb.msu.ru} [contributor]
+  \item Ludmila Danilova \email{ludmila.danilova@gmail.com} [contributor]
 }
 
 }
