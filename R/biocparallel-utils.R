@@ -1,7 +1,7 @@
 #' Normalise a BiocParallel backend parameter
 #'
 #' Validates and configures a \code{BiocParallelParam} object for use in
-#' \code{friends.test} and \code{friends.test.bic}.  When \code{BPPARAM} is
+#' \code{friends_test} and \code{friends_test_bic}.  When \code{BPPARAM} is
 #' \code{NULL} the function falls back to
 #' \code{\link[BiocParallel]{SerialParam}}
 #' so that callers always receive a usable backend.  The progress bar is
@@ -17,6 +17,14 @@
 #'
 #' @keywords internal
 #' @noRd
+# cli progress bar format for a finished bar: show the elapsed time
+# instead of the "ETA: 0s" the default format ends with.
+ft_pb_format_done <- paste0(
+    "{cli::pb_name}{cli::pb_bar} ",
+    "{cli::pb_percent} | {cli::pb_elapsed}"
+)
+
+
 ft_bpparam <- function(BPPARAM = NULL, .progress = FALSE) {
     if (is.null(BPPARAM)) {
         BPPARAM <- BiocParallel::SerialParam()

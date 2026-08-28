@@ -1,5 +1,5 @@
 #'
-#' friends.test.bic
+#' friends_test_bic
 #'
 #' We have two sets:T (rows) and C (columns) and
 #' A real matrix A(t,c) that describes the strength of association
@@ -51,18 +51,21 @@
 #'     nrow = 6, ncol = 5, byrow = TRUE
 #' )
 #' A
-#' friends.test.bic(A, prior.to.have.friends = 0.5)
-#' friends.test.bic(A, prior.to.have.friends = 0.001)
+#' friends_test_bic(A, prior.to.have.friends = 0.5)
+#' friends_test_bic(A, prior.to.have.friends = 0.001)
 #' @importFrom stats p.adjust
 #' @importFrom purrr array_branch compact pmap
 #' @importFrom cli cli_progress_step cli_progress_done cli_progress_along
+#' @importFrom methods is
 #' @export
 #'
-friends.test.bic <- function(A = NULL,
-                             prior.to.have.friends = -1,
-                             max.friends.n = "all",
-                             .progress = FALSE,
-                             BPPARAM = NULL) {
+friends_test_bic <- function(
+    A = NULL,
+    prior.to.have.friends = -1,
+    max.friends.n = "all",
+    .progress = FALSE,
+    BPPARAM = NULL
+) {
     # parameter checks
     if (is.null(A) || (length(dim(A)) != 2))  {
         stop("The first parameter must be a non-empty 2D matrix-like object.")
@@ -73,18 +76,20 @@ friends.test.bic <- function(A = NULL,
             max.friends.n == "a") {
         max.friends.n <- ncol(A)
     } else if (!is.numeric(max.friends.n)) {
-        stop(paste(
-            "max.friends.n must be numeric,",
-            " or one of 'all', 'al', 'a', NA, or NULL."
-        ))
+        stop(
+            "max.friends.n must be numeric, ",
+            "or one of 'all', 'al', 'a', NA, or NULL."
+        )
     }
 
     if (max.friends.n < 1 || max.friends.n > ncol(A)) {
         stop("max.friends.n must be between 1 and the number of columns.")
     }
     if (prior.to.have.friends < 0 || prior.to.have.friends > 1) {
-        stop("friends.test.bic requires the prior.to.have.friends
-          value to be explicitly provided and to be a prior.")
+        stop(
+            "friends_test_bic requires the prior.to.have.friends value ",
+            "to be explicitly provided and to be a prior."
+        )
     }
     # add names to A matrix rows if necessary
     if (is.null(dimnames(A)[[1]])) {
@@ -100,7 +105,7 @@ friends.test.bic <- function(A = NULL,
     use_serial_progress <- .progress && is(BPPARAM, "SerialParam")
     # rank all the A elements in columns
     if (.progress) cli::cli_progress_step("Ranking...")
-    all_ranks <- friends.test::row.int.ranks(A)
+    all_ranks <- row_int_ranks(A)
     max.possible.rank <- dim(A)[1]
     all_rank_rows <- purrr::array_branch(all_ranks, 1)
 
@@ -112,7 +117,7 @@ friends.test.bic <- function(A = NULL,
     if (use_serial_progress) {
         cli::cli_progress_done() # close "Ranking..."
         fit_one <- function(ranks, i) {
-            step <- best.step.fit.bic(
+            step <- best_step_fit_bic(
                 ranks,
                 max.possible.rank = max.possible.rank,
                 prior.to.have.friends = prior.to.have.friends
@@ -125,14 +130,17 @@ friends.test.bic <- function(A = NULL,
             )
             repi <- rep(i, length(friends))
             names(repi) <- col_names[friends]
-            purrr::pmap(list(marker = repi, friend = friends, rank = friend.ranks), c)
+            purrr::pmap(
+                list(marker = repi, friend = friends, rank = friend.ranks),
+                c
+            )
         }
         ijrlist <- lapply(
             cli::cli_progress_along(
                 all_rank_rows,
                 name = "Fitting the models",
                 clear = FALSE,
-                format_done = "{cli::pb_name}{cli::pb_bar} {cli::pb_percent} | {cli::pb_elapsed}"
+                format_done = ft_pb_format_done
             ),
             function(idx) fit_one(all_rank_rows[[idx]], idx)
         )
@@ -145,9 +153,12 @@ friends.test.bic <- function(A = NULL,
             # parent's library paths so workers can find friends.test at
             # execution time.
             local(
-                \(ranks, i, max.friends.n, max.possible.rank, prior.to.have.friends, col_names, libs) {
+                \(
+                    ranks, i, max.friends.n, max.possible.rank,
+                    prior.to.have.friends, col_names, libs
+                ) {
                     .libPaths(libs)
-                    step <- friends.test::best.step.fit.bic(
+                    step <- friends.test::best_step_fit_bic(
                         ranks,
                         max.possible.rank = max.possible.rank,
                         prior.to.have.friends = prior.to.have.friends

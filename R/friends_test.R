@@ -1,5 +1,5 @@
 #'
-#' friends.test
+#' friends_test
 #'
 #' We have two sets: T (rows) and C (columns) and
 #' A real matrix A(t,c) that describes the strength of association
@@ -62,24 +62,28 @@
 #'     nrow = 6, ncol = 5, byrow = TRUE
 #' )
 #' A
-#' friends.test(A, threshold = .05)
-#' friends.test(A, threshold = .0001)
-#' friends.test(A, threshold = .05, uniform.max = "m")
-#' friends.test(A, threshold = .0001, uniform.max = "m")
+#' friends_test(A, threshold = .05)
+#' friends_test(A, threshold = .0001)
+#' friends_test(A, threshold = .05, uniform.max = "m")
+#' friends_test(A, threshold = .0001, uniform.max = "m")
 #'
 #' @importFrom stats p.adjust
 #' @importFrom purrr array_branch compact pmap
 #' @importFrom cli cli_progress_step cli_progress_done cli_progress_along
+#' @importFrom methods is
 #' @export
 #'
-friends.test <- function(A = NULL, threshold = 0.05,
-                         p.adjust.method = "BH",
-                         max.friends.n = "all",
-                         uniform.max = "m",
-                         simulate.p.value = FALSE,
-                         B = 2000,
-                         .progress = FALSE,
-                         BPPARAM = NULL) {
+friends_test <- function(
+    A = NULL,
+    threshold = 0.05,
+    p.adjust.method = "BH",
+    max.friends.n = "all",
+    uniform.max = "m",
+    simulate.p.value = FALSE,
+    B = 2000,
+    .progress = FALSE,
+    BPPARAM = NULL
+) {
     # parameter checks
     if (is.null(A) || (length(dim(A)) != 2))  {
         stop("The first parameter must be a non-empty 2D matrix-like object.")
@@ -90,10 +94,10 @@ friends.test <- function(A = NULL, threshold = 0.05,
             max.friends.n == "a") {
         max.friends.n <- ncol(A)
     } else if (!is.numeric(max.friends.n)) {
-        stop(paste(
-            "max.friends.n must be numeric,",
-            " or one of 'all', 'al', 'a', NA, or NULL."
-        ))
+        stop(
+            "max.friends.n must be numeric, ",
+            "or one of 'all', 'al', 'a', NA, or NULL."
+        )
     }
 
     if (max.friends.n < 1 || max.friends.n > ncol(A)) {
@@ -128,11 +132,12 @@ friends.test <- function(A = NULL, threshold = 0.05,
 
     # rank all the A elements in columns
     if (.progress) cli::cli_progress_step("Ranking...")
-    all_ranks <- friends.test::row.int.ranks(A)
+    all_ranks <- row_int_ranks(A)
     all_rank_rows <- purrr::array_branch(all_ranks, 1)
 
     # calculate the p-values for null hypothesis for all the rank rows
-    # pipeline : array to list, list to double vector of p-values, adjust p-value
+    # pipeline: array to list, list to double vector of p-values,
+    # then adjust the p-values
     if (use_serial_progress) {
         cli::cli_progress_done() # close "Ranking..."
         adj_nunif_pval <- vapply(
@@ -140,9 +145,9 @@ friends.test <- function(A = NULL, threshold = 0.05,
                 all_rank_rows,
                 name = "Filtering out uniforms",
                 clear = FALSE,
-                format_done = "{cli::pb_name}{cli::pb_bar} {cli::pb_percent} | {cli::pb_elapsed}"
+                format_done = ft_pb_format_done
             ),
-            function(i) unif.ks.test(
+            function(i) unif_ks_test(
                 all_rank_rows[[i]],
                 uniform.max = uniform.max,
                 simulate.p.value = simulate.p.value,
@@ -164,7 +169,7 @@ friends.test <- function(A = NULL, threshold = 0.05,
                 local(
                     function(x, uniform.max, simulate.p.value, B, libs) {
                         .libPaths(libs)
-                        friends.test::unif.ks.test(
+                        friends.test::unif_ks_test(
                             x,
                             uniform.max = uniform.max,
                             simulate.p.value = simulate.p.value,
@@ -209,7 +214,7 @@ friends.test <- function(A = NULL, threshold = 0.05,
     col_names <- colnames(A)
     if (use_serial_progress) {
         fit_one <- function(ranks, i) {
-            step <- best.step.fit(ranks, max.possible.rank = max.possible.rank)
+            step <- best_step_fit(ranks, max.possible.rank = max.possible.rank)
             if (length(step$columns.on.left) > max.friends.n) return(NULL)
             friends <- step$columns.on.left
             friend.ranks <- which(
@@ -217,16 +222,21 @@ friends.test <- function(A = NULL, threshold = 0.05,
             )
             repi <- rep(i, length(friends))
             names(repi) <- col_names[friends]
-            purrr::pmap(list(marker = repi, friend = friends, rank = friend.ranks), c)
+            purrr::pmap(
+                list(marker = repi, friend = friends, rank = friend.ranks),
+                c
+            )
         }
         ijrlist <- lapply(
             cli::cli_progress_along(
                 marker_rank_rows,
                 name = "Identifying friends",
                 clear = FALSE,
-                format_done = "{cli::pb_name}{cli::pb_bar} {cli::pb_percent} | {cli::pb_elapsed}"
+                format_done = ft_pb_format_done
             ),
-            function(idx) fit_one(marker_rank_rows[[idx]], marker_indices[[idx]])
+            function(idx) {
+                fit_one(marker_rank_rows[[idx]], marker_indices[[idx]])
+            }
         )
     } else {
         if (.progress) cli::cli_progress_step("Identifying friends...")
@@ -243,7 +253,7 @@ friends.test <- function(A = NULL, threshold = 0.05,
             local(
                 \(ranks, i, max.possible.rank, max.friends.n, col_names, libs) {
                     .libPaths(libs)
-                    step <- friends.test::best.step.fit(
+                    step <- friends.test::best_step_fit(
                         ranks,
                         max.possible.rank = max.possible.rank
                     )

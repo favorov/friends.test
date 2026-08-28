@@ -1,10 +1,10 @@
 #'
-#' unif.ks.test
+#' unif_ks_test
 #'
 #' returns the Kolomogorov-Smirnov p-value for uniformity of the values.
 #' The values are the ranks of the same row in different columns.
 #'
-#' See [friends.test] documentation for details.
+#' See [friends_test] documentation for details.
 #'
 #' @param ranks vector of ranks of a row in different columns, \eqn{1 .. N})
 #' @param uniform.max the maximal rank in the uniform, default is NA which means
@@ -16,13 +16,15 @@
 #' @return p-value for the KS test comparing the ranks distribution with uniform
 #' @importFrom stats ks.test
 #' @examples
-#' example(row.int.ranks)
-#' ks.p.vals <- apply(TF.ranks, 1, "unif.ks.test")
+#' example(row_int_ranks)
+#' ks.p.vals <- apply(TF.ranks, 1, "unif_ks_test")
 #' @export
-unif.ks.test <- function(ranks,
-                         uniform.max = NA,
-                         simulate.p.value = FALSE,
-                         B = 2000) {
+unif_ks_test <- function(
+    ranks,
+    uniform.max = NA,
+    simulate.p.value = FALSE,
+    B = 2000
+) {
     jranks <- jitter(ranks, amount = 0.1E-6)
     jrmin <- min(jranks)
     if (is.na(uniform.max)) {
