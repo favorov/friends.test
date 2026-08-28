@@ -6,12 +6,9 @@
 \usage{
 friends_test(
   A = NULL,
-  threshold = 0.05,
-  p.adjust.method = "BH",
+  mode = c("ks", "bic"),
+  ...,
   max.friends.n = "all",
-  uniform.max = "m",
-  simulate.p.value = FALSE,
-  B = 2000,
   .progress = FALSE,
   BPPARAM = NULL
 )
@@ -19,32 +16,24 @@ friends_test(
 \arguments{
 \item{A}{original association matrix}
 
-\item{threshold}{The adjusted p-value threshold for KS test for
-non-uniformity of ranks.}
+\item{mode}{which test decides whether a row has friends: \code{"ks"}
+(default) for the Kolmogorov-Smirnov branch, \link{friends_test_ks}, or
+\code{"bic"} for the Bayesian one, \link{friends_test_bic}.}
 
-\item{p.adjust.method}{Multiple testing correction method,
-see \link[stats]{p.adjust}.}
+\item{...}{further arguments for the function selected by \code{mode}.}
 
 \item{max.friends.n}{The maximal number of friends for a marker.
 A value $n$ means that we filter out a row if it has more
 than $n$ friendly columns. 1 means we look only for unique (best) friends.
-The string "all" (default) means the same as \code{ncols(A)} value,
-do not filter markers by this parameter.}
+The string \code{"all"} (the default) and \code{NULL} both mean
+\code{ncol(A)}, that is, do not filter markers by this parameter.}
 
-\item{uniform.max}{The maximum of the uniform distribution of the ranks we
-fit the null model, it can be the maximal possible rank that is common for
-all rows and equals the number of rows \code{'c'} or the maximal observed
-rank for the row we test now, \code{'m'} (default).}
-
-\item{simulate.p.value}{K-S by Monte-Carlo if \code{TRUE};
-default is \code{FALSE}, see \code{\link[stats:ks.test]{stats::ks.test()}}.}
-
-\item{B}{number of or replicates if \code{simulate.p.value=TRUE}
-default is 2000, see \code{\link[stats:ks.test]{stats::ks.test()}}.}
-
-\item{.progress}{if \code{TRUE}, show simple progress messages and enable
-the text progress bar of the selected \code{BPPARAM}. The default is
-\code{FALSE}.}
+\item{.progress}{if \code{TRUE}, report what the call is doing. What you see
+depends on the backend: a serial one draws a \code{cli} progress bar with a
+percentage and the elapsed time, a parallel one only names the stage it has
+reached, since the text progress bar of \code{BPPARAM} is switched off.
+Neither renders when the output is redirected rather than shown in a
+terminal, so build logs stay quiet. The default is \code{FALSE}.}
 
 \item{BPPARAM}{a \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} instance that
 controls whether the row-wise work is run serially or in parallel. The
@@ -73,6 +62,18 @@ If it does, those c for which the t is relevant,
 are the t's friend. And, the t is the c's marker.
 }
 \details{
+Two ways of deciding whether a row really has friends are provided, and
+they ask different questions.  \code{mode = "ks"} (the default) runs
+\link{friends_test_ks}, which tests whether the row's ranks are uniformly
+spread over the columns, wherever that spread happens to sit.
+\code{mode = "bic"} runs \link{friends_test_bic}, which compares a step model
+against a uniform one over the whole rank scale.  Both return the same
+structure, so a pipeline can switch between them.
+
+Arguments other than the ones listed below are passed to the function
+selected by \code{mode}; see its documentation for what each mode accepts.
+Passing an argument that belongs to the other mode is an error.
+
 If you want to run the row-wise calculations in parallel,
 pass a \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} object via \code{BPPARAM},
 for instance \code{BiocParallel::MulticoreParam(workers = 4)} on Unix-like
@@ -92,8 +93,9 @@ A <- matrix(
 )
 A
 friends_test(A, threshold = .05)
-friends_test(A, threshold = .0001)
-friends_test(A, threshold = .05, uniform.max = "m")
-friends_test(A, threshold = .0001, uniform.max = "m")
+friends_test(A, mode = "bic", prior.to.have.friends = 0.5)
 
+}
+\seealso{
+\link{friends_test_ks}, \link{friends_test_bic}
 }

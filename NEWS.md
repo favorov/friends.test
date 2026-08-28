@@ -1,5 +1,66 @@
 # Friends.test version history
 
+## friends.test 0.99.22
+
+- `friends_test()` is now the entry point for both branches: its `mode` argument
+  selects `"ks"` (the default) or `"bic"` and passes the remaining arguments on.
+  Passing an argument that belongs to the other mode is an error.
+- The Kolmogorov-Smirnov branch, previously `friends_test()` itself, is now
+  `friends_test_ks()`. `friends_test_bic()` is unchanged. All three are exported.
+- The row-wise stages of both branches now go through one internal driver
+  instead of a serial and a parallel copy each, and the two step fitters share
+  their search and their assembly. No result changes.
+- Worker library paths are only set when they differ from the ones already in
+  effect. Setting them costs about 34 microseconds against 0.2 for reading
+  them, and it was being done once per row: a pass over the 15176 by 8 example
+  matrix drops from 2.08 to 1.58 seconds.
+- `best_step_fit_bic()` no longer raises an error when every rank in a row is
+  tied and `prior.to.have.friends` is 1; it reports no friends, as it already
+  did for every other prior.
+- `cli.progress_show_after`, which `.progress = TRUE` sets, is now restored on
+  exit instead of being left changed in the user's session.
+- `max.friends.n` no longer accepts the abbreviations `"al"` and `"a"`, nor
+  `NA`. `"all"` and `NULL` still mean every column, and a number still means a
+  number.
+- The startup message is only printed in an interactive session. The reviewer
+  pointed out that a workflow attaching dozens of packages does not want a
+  line from each of them; scripts, vignettes and build machines now see
+  nothing.
+- `unif_ks_test()` computed its test twice, once on ranks mapped to the unit
+  interval and once on the raw scale, and threw the first result away. The two
+  are the same test, so the duplicate is gone. It also jittered the ranks a
+  second time while keeping the first jitter's maximum as the upper end of the
+  support, which could put a point outside the declared support.
+- `uniform.max` is replaced by `uniform.null`, which names the whole
+  convention rather than one endpoint. `"observed"`, the default, keeps the
+  present behaviour: the support is the row's own range, so the test is
+  invariant to where the profile sits and a row spread evenly over part of the
+  scale still counts as uniform. `"continuity"` and `"randomized"` fix the
+  support at the whole rank scale instead; they are calibrated, but treat
+  concentration as evidence. They need `max.possible.rank`.
+- The `"c"` setting of `uniform.max` is withdrawn rather than renamed. It took
+  the lower end of the support from the data and the upper end from the rank
+  scale, which is not a null hypothesis: measured against uniform rows it
+  rejected at 0.066 instead of 0.05 with eight columns, and at 0.084 with
+  three.
+- The documentation of `.progress` said it enabled the text progress bar of the
+  chosen `BPPARAM`. It does not: that bar has been off since 0.99.20 and the
+  package draws its own. What you actually see now says so, including that
+  neither kind renders when the output is redirected rather than shown in a
+  terminal.
+- The validity messages of `step_fit_ln_likelihoods()` name the argument they
+  are about. The first one used to refer to a `Rows_no` parameter, which the
+  function has never had, and two different problems shared the message
+  "Ranks are to be integer!".
+- The vignette is formatted with `BiocStyle`, has an Installation section, and
+  uses subsections where it used `\paragraph{}`, which never rendered.
+- `devtools` and `markdown` are dropped from `Suggests`. The vignette was the
+  only thing that named them, and it no longer does.
+- The example data is documented: what each of its three elements is, how
+  `data-raw/cogaps_example.r` builds it, and the terms its sources are under.
+- `Authors@R` gives each co-author one role rather than both `aut` and `ctb`,
+  and names the funder of the work.
+
 ## friends.test 0.99.21
 
 - Exported function names no longer contain dots, as the dot is reserved for S3

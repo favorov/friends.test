@@ -1,13 +1,13 @@
 #'
-#' friends_test_bic
+#' friends_test_ks
 #'
-#' We have two sets:T (rows) and C (columns) and
-#' A real matrix A(t,c) that describes the strength of association
-#' between each t and each c; t is an element of T and c is an element of C.
-#' For each t we want to identify whether it is significantly more
-#' relevant for some c's than for the remaining c's.
-#' If it does, those c for which the t is relevant,
-#' are the t's friend. And, the t is the c's marker.
+#' The Kolmogorov-Smirnov branch of the friends test. For every row it tests
+#' the null hypothesis that the row's ranks are uniformly distributed over the
+#' columns; a row that rejects it is a marker, and the columns to the left of
+#' the best step are its friends.
+#'
+#' See [friends_test] for the method itself and for the Bayesian alternative
+#' [friends_test_bic].
 #'
 #' If you want to run the row-wise calculations in parallel,
 #' pass a [BiocParallel::BiocParallelParam-class] object via \code{BPPARAM},
@@ -15,12 +15,25 @@
 #' systems or \code{BiocParallel::SnowParam(workers = 4)} on all platforms.
 #'
 #' @param A original association matrix
-#' @param prior.to.have.friends The prior for a row to have friendly columns.
+#' @param threshold The adjusted p-value threshold for KS test for
+#' non-uniformity of ranks.
+#' @param p.adjust.method Multiple testing correction method,
+#' see \link[stats]{p.adjust}.
 #' @param max.friends.n The maximal number of friends for a marker.
 #' A value $n$ means that we filter out a row if it has more
 #' than $n$ friendly columns. 1 means we look only for unique (best) friends.
 #' The string \code{"all"} (the default) and \code{NULL} both mean
 #' \code{ncol(A)}, that is, do not filter markers by this parameter.
+#' @param uniform.null how the support of the uniform null is chosen, passed
+#' on to [unif_ks_test], which describes the three settings.
+#' \code{"observed"}, the default, fits it to the row's own range and so makes
+#' the test invariant to shift and scale. \code{"continuity"} and
+#' \code{"randomized"} fix it at the whole rank scale: they are calibrated,
+#' but count concentration as evidence.
+#' @param simulate.p.value K-S by Monte-Carlo if \code{TRUE};
+#' default is \code{FALSE}, see [stats::ks.test()].
+#' @param B number of or replicates if \code{simulate.p.value=TRUE}
+#' default is 2000, see [stats::ks.test()].
 #' @param .progress if \code{TRUE}, report what the call is doing. What you see
 #' depends on the backend: a serial one draws a \code{cli} progress bar with a
 #' percentage and the elapsed time, a parallel one only names the stage it has
@@ -54,18 +67,24 @@
 #'     nrow = 6, ncol = 5, byrow = TRUE
 #' )
 #' A
-#' friends_test_bic(A, prior.to.have.friends = 0.5)
-#' friends_test_bic(A, prior.to.have.friends = 0.001)
+#' friends_test_ks(A, threshold = .05)
+#' friends_test_ks(A, threshold = .0001)
+#' friends_test_ks(A, threshold = .05, uniform.null = "continuity")
+#'
 #' @importFrom stats p.adjust
 #' @importFrom purrr array_branch compact pmap
 #' @importFrom cli cli_progress_step cli_progress_done cli_progress_along
 #' @importFrom methods is
 #' @export
 #'
-friends_test_bic <- function(
+friends_test_ks <- function(
     A = NULL,
-    prior.to.have.friends = -1,
+    threshold = 0.05,
+    p.adjust.method = "BH",
     max.friends.n = "all",
+    uniform.null = c("observed", "continuity", "randomized"),
+    simulate.p.value = FALSE,
+    B = 2000,
     .progress = FALSE,
     BPPARAM = NULL
 ) {
@@ -76,41 +95,79 @@ friends_test_bic <- function(
         on.exit(options(old_options), add = TRUE)
     }
 
-    if (prior.to.have.friends < 0 || prior.to.have.friends > 1) {
-        stop(
-            "friends_test_bic requires the prior.to.have.friends value ",
-            "to be explicitly provided and to be a prior."
-        )
+    if (threshold < 0 || threshold > 1) {
+        stop("threshold must be between 0 and 1.")
     }
+    uniform.null <- match.arg(uniform.null)
 
     prep <- .ft_prepare(A, max.friends.n, .progress, BPPARAM)
     A <- prep$A
     max.friends.n <- prep$max.friends.n
     BPPARAM <- prep$BPPARAM
+    all_ranks <- prep$ranks
     all_rank_rows <- prep$rows
-    max.possible.rank <- nrow(A)
 
+    # calculate the p-values for null hypothesis for all the rank rows
+    adj_nunif_pval <- unlist(
+        .ft_map_rows(
+            function(
+                row, i, uniform.null, max.possible.rank,
+                simulate.p.value, B
+            ) {
+                friends.test::unif_ks_test(
+                    row,
+                    uniform.null = uniform.null,
+                    max.possible.rank = max.possible.rank,
+                    simulate.p.value = simulate.p.value,
+                    B = B
+                )
+            },
+            rows = all_rank_rows,
+            idx = seq_along(all_rank_rows),
+            MoreArgs = list(
+                uniform.null = uniform.null,
+                max.possible.rank = nrow(A),
+                simulate.p.value = simulate.p.value,
+                B = B
+            ),
+            BPPARAM = BPPARAM,
+            .progress = .progress,
+            label = "Filtering out uniforms"
+        ),
+        use.names = FALSE
+    ) |> p.adjust(method = p.adjust.method)
+
+    is_marker <- (adj_nunif_pval <= threshold)
+    # is it a marker?
+
+    if (sum(is_marker) == 0) {
+        message("No rows with non-uniform ranks found for given threshold.")
+        return(list())
+        # empty matrix return
+    }
+
+    marker_indices <- which(is_marker)
+
+    # find friends that make in-marker ranks non-uniform
+    max.possible.rank <- dim(A)[1]
     #run ut all in purrr style
     #return: list of list of, trios
     #i, j, r -- vectors:
     #marker, friend, friend.rank
+    marker_rank_rows <- purrr::array_branch(
+        all_ranks[marker_indices, , drop = FALSE],
+        1
+    )
     col_names <- colnames(A)
     # return: list of lists of trios -- marker, friend, friend.rank
     ijrlist <- .ft_map_rows(
-        function(
-            row, i, max.friends.n, max.possible.rank,
-            prior.to.have.friends, col_names
-        ) {
-            step <- friends.test::best_step_fit_bic(
+        function(row, i, max.possible.rank, max.friends.n, col_names) {
+            step <- friends.test::best_step_fit(
                 row,
-                max.possible.rank = max.possible.rank,
-                prior.to.have.friends = prior.to.have.friends
+                max.possible.rank = max.possible.rank
             )
-            frn <- length(step$columns.on.left)
-            if (frn == 0 || frn > max.friends.n) {
-                # either the uniform model won, so there is nothing to the left
-                # of the step, or the marker has too many friends
-                return(NULL)
+            if (length(step$columns.on.left) > max.friends.n) {
+                return(NULL) # marker has too many friends
             }
             friends <- step$columns.on.left
             # the ranks of the friends, the best is 1
@@ -124,23 +181,21 @@ friends_test_bic <- function(
                 c
             )
         },
-        rows = all_rank_rows,
-        idx = seq_len(nrow(A)),
+        rows = marker_rank_rows,
+        idx = marker_indices,
         MoreArgs = list(
-            max.friends.n = max.friends.n,
             max.possible.rank = max.possible.rank,
-            prior.to.have.friends = prior.to.have.friends,
+            max.friends.n = max.friends.n,
             col_names = col_names
         ),
         BPPARAM = BPPARAM,
         .progress = .progress,
-        label = "Fitting the models"
+        label = "Identifying friends"
     )
-    names(ijrlist) <- names(all_rank_rows)
+    names(ijrlist) <- names(marker_rank_rows)
 
     if (.progress) cli::cli_progress_step("Compacting...")
     ijrlist <- purrr::compact(ijrlist)
     if (.progress) cli::cli_progress_done()
     ijrlist
-
 }
