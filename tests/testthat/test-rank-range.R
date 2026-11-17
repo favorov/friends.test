@@ -1,6 +1,7 @@
-# The rank scale the step models are fitted on, in both branches.  "continuity" is the
-# whole 1..N scale, which is what the branch did before 0.99.23; "observed"
-# takes the ends from the row, as the KS branch does by default.
+# The rank scale the step models are fitted on, in both branches.
+# "continuity" is the whole 1..N scale, which is what the branch did before
+# 0.99.23; "observed" takes the ends from the row, as the KS branch does by
+# default.
 
 
 test_that("continuity reproduces the fits of 0.99.22", {
@@ -56,7 +57,9 @@ test_that("observed is continuity on the rebased row", {
         )
         expect_identical(observed$columns.on.left, rebased$columns.on.left)
         expect_identical(observed$columns.on.right, rebased$columns.on.right)
-        expect_identical(observed$population.on.left, rebased$population.on.left)
+        expect_identical(
+            observed$population.on.left, rebased$population.on.left
+        )
         expect_identical(
             observed$best.step.rank,
             rebased$best.step.rank + lowest - 1L
@@ -190,12 +193,15 @@ test_that("best_step_fit follows the scale it is given", {
 
 
 test_that("friends_test_ks locates the step on the scale it tested on", {
+    # twelve columns, not eight: a tied row is tested against the asymptotic
+    # Kolmogorov law, and with eight columns the smallest p-value no longer
+    # survives the BH adjustment over twenty rows
     set.seed(9)
-    A <- matrix(rnorm(20 * 8), nrow = 20, ncol = 8)
-    A[1, 1:3] <- A[1, 1:3] + 12
-    A[2, 4:5] <- A[2, 4:5] + 12
+    A <- matrix(rnorm(20 * 12), nrow = 20, ncol = 12)
+    A[1, 1:4] <- A[1, 1:4] + 12
+    A[2, 5:7] <- A[2, 5:7] + 12
     rownames(A) <- paste0("row", seq_len(20))
-    colnames(A) <- paste0("col", seq_len(8))
+    colnames(A) <- paste0("col", seq_len(12))
     # rnorm leaves no ties, so the ranks do not depend on the tie-breaking RNG
     ranks <- row_int_ranks(A)
 
@@ -212,7 +218,9 @@ test_that("friends_test_ks locates the step on the scale it tested on", {
                 uniform.null = step.null
             )
             expect_identical(
-                unname(vapply(got[[nm]], function(t) t[["friend"]], integer(1))),
+                unname(
+                    vapply(got[[nm]], function(t) t[["friend"]], integer(1))
+                ),
                 fit$columns.on.left,
                 info = paste(null, nm)
             )

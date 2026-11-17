@@ -15,8 +15,7 @@
 #'     ranks are spread evenly over part of the scale counts as uniform.  That
 #'     is deliberate: the method looks for a structural break, not for a shift.
 #'     The price is that both endpoints are fitted to the sample, so the
-#'     p-value is conservative -- with three columns the test cannot reject at
-#'     all.}
+#'     p-value is conservative.}
 #'   \item{\code{"continuity"}}{the support is \eqn{[0.5, N + 0.5]}, spreading
 #'     each integer \eqn{i} over \eqn{[i - 0.5, i + 0.5]}.  Nothing is fitted,
 #'     so the p-value is calibrated, but concentration into part of the scale
@@ -31,6 +30,34 @@
 #' \code{"continuity"} and \code{"randomized"} need to know \eqn{N}, which is
 #' \code{max.possible.rank}.
 #'
+#' The ranks are integers, so a row almost always holds ties.  Nothing is
+#' displaced to hide them: \code{\link[stats]{ks.test}} computes the statistic
+#' correctly on a tied sample, and only the null distribution is affected --
+#' it drops to the asymptotic Kolmogorov law, which this function asks for
+#' explicitly.  A tie-free row keeps the exact law, which is calibrated for
+#' it.  One consequence is that \code{"observed"} and \code{"continuity"} draw
+#' no random numbers and repeat exactly; only \code{"randomized"} varies
+#' between runs.
+#'
+#' The fitted support decreases the sensitivity of the test, and with few
+#' columns the loss decides the outcome: under \code{"observed"} the p-value
+#' of a row of \eqn{k} columns is bounded below by \eqn{2 / k^k}.  That is
+#' 0.074 for \eqn{k = 3}, so a three-column matrix yields no markers at any
+#' conventional threshold, and 0.0078, \eqn{6.4 \times 10^{-4}}{6.4e-4} and
+#' \eqn{4.3 \times 10^{-5}}{4.3e-5} for four, five and six columns.  The
+#' bound is
+#' approached, not reached, by a row that puts all of its ranks but one at one
+#' end of its own range, and it bounds the raw p-value: a run over many rows
+#' has to survive \code{p.adjust.method} as well.  The fixed-support
+#' conventions have no such floor -- \code{"continuity"} returns about 0.005
+#' for three columns of a tall matrix -- which is the other half of the price
+#' of invariance.
+#'
+#' Under \code{"observed"}, a row holding a single rank leaves the fitted
+#' support no width at all.  There is no structural break to find there, so
+#' the p-value is 1.  The fixed-support conventions read such a row as the
+#' evidence it is.
+#'
 #' See [friends_test] documentation for details.
 #'
 #' @param ranks vector of ranks of a row in different columns, \eqn{1 .. N})
@@ -40,10 +67,9 @@
 #' @param max.possible.rank the largest rank a row can take, \eqn{N}, that is
 #' the number of rows of the matrix the ranks came from. Required unless
 #' \code{uniform.null} is \code{"observed"}, which does not use it.
-#' @param simulate.p.value K-S by Monte-Carlo if \code{TRUE};
-#' default is \code{FALSE}, see [stats::ks.test()]
-#' @param B number of or replicates if \code{simulate.p.value=TRUE}
-#' default is 2000, see [stats::ks.test()]
+#' @param simulate.p.value ignored: the one-sample
+#' \code{\link[stats]{ks.test}} does not use it.
+#' @param B ignored, see \code{simulate.p.value}.
 #' @return p-value for the KS test comparing the ranks distribution with uniform
 #' @importFrom stats ks.test runif
 #' @examples
@@ -58,6 +84,16 @@ unif_ks_test <- function(
     simulate.p.value = FALSE,
     B = 2000
 ) {
+    # the one-sample ks.test() never read these two, so they are ignored here
+    # as well; they stay in the signature so that a call passing them warns
+    # instead of failing
+    if (!missing(simulate.p.value) || !missing(B)) {
+        warning(
+            "'simulate.p.value' and 'B' are ignored: ",
+            "the one-sample ks.test() does not use them."
+        )
+    }
+
     uniform.null <- match.arg(uniform.null)
 
     if (uniform.null != "observed" &&
@@ -73,9 +109,7 @@ unif_ks_test <- function(
         # uniform on the integers 1..N, so no approximation is involved
         values <- ranks + runif(length(ranks), -0.5, 0.5)
     } else {
-        # a displacement far too small to move anything, there only to break
-        # ties so that ks.test is not handed a tied sample
-        values <- jitter(ranks, amount = 0.1E-6)
+        values <- as.double(ranks)
     }
 
     support <- if (uniform.null == "observed") {
@@ -84,10 +118,28 @@ unif_ks_test <- function(
         c(0.5, max.possible.rank + 0.5)
     }
 
-    ks.test(
-        values, "punif",
-        min = support[1L], max = support[2L],
-        simulate.p.value = simulate.p.value,
-        B = B
-    )$p.value
+    # a row holding a single rank leaves the fitted support no width, so the
+    # null collapses onto that one point and the row matches it exactly.
+    # ks.test cannot say that: its formula assumes a continuous null and
+    # reports D = 1. The fixed-support conventions need no such care.
+    if (uniform.null == "observed" && support[1L] == support[2L]) {
+        return(1)
+    }
+
+    ties <- anyDuplicated(values) > 0L
+
+    ks <- function() {
+        ks.test(
+            values, "punif",
+            min = support[1L], max = support[2L],
+            exact = if (ties) FALSE else NULL
+        )$p.value
+    }
+
+    # A tied sample has no continuous null, so ks.test drops to the asymptotic
+    # Kolmogorov law and warns. Ask for that law explicitly, which keeps the
+    # choice visible and independent of ks.test's own default, and muffle the
+    # warning just answered -- its text is translated, so matching it is not
+    # reliable.
+    if (ties) suppressWarnings(ks()) else ks()
 }

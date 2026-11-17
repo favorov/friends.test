@@ -17,7 +17,7 @@ friends_test_ks(
 )
 }
 \arguments{
-\item{A}{original association matrix}
+\item{A}{the original interaction matrix}
 
 \item{threshold}{The adjusted p-value threshold for KS test for
 non-uniformity of ranks.}
@@ -26,8 +26,8 @@ non-uniformity of ranks.}
 see \link[stats]{p.adjust}.}
 
 \item{max.friends.n}{The maximal number of friends for a marker.
-A value $n$ means that we filter out a row if it has more
-than $n$ friendly columns. 1 means we look only for unique (best) friends.
+A value \eqn{n} means that we filter out a row if it has more than
+\eqn{n} friendly columns. 1 means we look only for unique (best) friends.
 The string \code{"all"} (the default) and \code{NULL} both mean
 \code{ncol(A)}, that is, do not filter markers by this parameter.}
 
@@ -41,11 +41,10 @@ stage, where \link{best_step_fit} locates the step, so that both stages measure
 the row on one scale; the step model is discrete, so \code{"randomized"}
 reaches it as \code{"continuity"}, which names the same support.}
 
-\item{simulate.p.value}{K-S by Monte-Carlo if \code{TRUE};
-default is \code{FALSE}, see \code{\link[stats:ks.test]{stats::ks.test()}}.}
+\item{simulate.p.value}{ignored: the one-sample
+\code{\link[stats]{ks.test}} does not use it.}
 
-\item{B}{number of or replicates if \code{simulate.p.value=TRUE}
-default is 2000, see \code{\link[stats:ks.test]{stats::ks.test()}}.}
+\item{B}{ignored, see \code{simulate.p.value}.}
 
 \item{.progress}{if \code{TRUE}, report what the call is doing. What you see
 depends on the backend: a serial one draws a \code{cli} progress bar with a
@@ -59,13 +58,13 @@ controls whether the row-wise work is run serially or in parallel. The
 default is \code{BiocParallel::SerialParam()}.}
 }
 \value{
-\code{list}; each element represents a marker, \emph{e.g.},
+\code{list}; each element represents a marker, \emph{i.e.},
 a matrix row that has friend(s). Each element of the return list
 is also a list, one element per friend, and the 2-nd level element
 is an integer vector with three numbers, that are:
 the marker coordinate (\code{marker}),
 the friend coordinate (\code{friend}), and
-the the rank of the friend for the marker (\code{rank}).
+the rank of the friend for the marker (\code{rank}).
 So, it is list of lists of simple integer vectors, each
 vector represents a marker+friend pair,
 the inner lists enumerate friends,

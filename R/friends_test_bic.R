@@ -2,7 +2,7 @@
 #' friends_test_bic
 #'
 #' We have two sets:T (rows) and C (columns) and
-#' A real matrix A(t,c) that describes the strength of association
+#' a real interaction matrix A(t,c) that describes the interaction strength
 #' between each t and each c; t is an element of T and c is an element of C.
 #' For each t we want to identify whether it is significantly more
 #' relevant for some c's than for the remaining c's.
@@ -14,11 +14,12 @@
 #' for instance \code{BiocParallel::MulticoreParam(workers = 4)} on Unix-like
 #' systems or \code{BiocParallel::SnowParam(workers = 4)} on all platforms.
 #'
-#' @param A original association matrix
-#' @param prior.to.have.friends The prior for a row to have friendly columns.
+#' @param A the original interaction matrix
+#' @param prior.to.have.friends The prior probability that a row has friendly
+#' columns, a number in \eqn{[0, 1]}.  It has no default and has to be given.
 #' @param max.friends.n The maximal number of friends for a marker.
-#' A value $n$ means that we filter out a row if it has more
-#' than $n$ friendly columns. 1 means we look only for unique (best) friends.
+#' A value \eqn{n} means that we filter out a row if it has more than
+#' \eqn{n} friendly columns. 1 means we look only for unique (best) friends.
 #' The string \code{"all"} (the default) and \code{NULL} both mean
 #' \code{ncol(A)}, that is, do not filter markers by this parameter.
 #' @param uniform.null how the smallest and the largest possible rank are
@@ -36,13 +37,13 @@
 #' @param BPPARAM a [BiocParallel::BiocParallelParam-class] instance that
 #' controls whether the row-wise work is run serially or in parallel. The
 #' default is \code{BiocParallel::SerialParam()}.
-#' @return \code{list}; each element represents a marker, *e.g.*,
+#' @return \code{list}; each element represents a marker, *i.e.*,
 #' a matrix row that has friend(s). Each element of the return list
 #' is also a list, one element per friend, and the 2-nd level element
 #' is an integer vector with three numbers, that are:
 #' the marker coordinate (\code{marker}),
 #' the friend coordinate (\code{friend}), and
-#' the the rank of the friend for the marker (\code{rank}).
+#' the rank of the friend for the marker (\code{rank}).
 #' So, it is list of lists of simple integer vectors, each
 #' vector represents a marker+friend pair,
 #' the inner lists enumerate friends,
@@ -62,7 +63,6 @@
 #' A
 #' friends_test_bic(A, prior.to.have.friends = 0.5)
 #' friends_test_bic(A, prior.to.have.friends = 0.001)
-#' @importFrom stats p.adjust
 #' @importFrom purrr array_branch compact pmap
 #' @importFrom cli cli_progress_step cli_progress_done cli_progress_along
 #' @importFrom methods is
@@ -70,7 +70,7 @@
 #'
 friends_test_bic <- function(
     A = NULL,
-    prior.to.have.friends = -1,
+    prior.to.have.friends,
     max.friends.n = "all",
     uniform.null = c("observed", "continuity"),
     .progress = FALSE,
@@ -83,12 +83,7 @@ friends_test_bic <- function(
         on.exit(options(old_options), add = TRUE)
     }
 
-    if (prior.to.have.friends < 0 || prior.to.have.friends > 1) {
-        stop(
-            "friends_test_bic requires the prior.to.have.friends value ",
-            "to be explicitly provided and to be a prior."
-        )
-    }
+    .check_prior(prior.to.have.friends)
     uniform.null <- match.arg(uniform.null)
 
     prep <- .ft_prepare(A, max.friends.n, .progress, BPPARAM)
@@ -98,10 +93,6 @@ friends_test_bic <- function(
     all_rank_rows <- prep$rows
     max.possible.rank <- nrow(A)
 
-    #run ut all in purrr style
-    #return: list of list of, trios
-    #i, j, r -- vectors:
-    #marker, friend, friend.rank
     col_names <- colnames(A)
     # return: list of lists of trios -- marker, friend, friend.rank
     ijrlist <- .ft_map_rows(

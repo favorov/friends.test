@@ -14,14 +14,14 @@
 #' for instance \code{BiocParallel::MulticoreParam(workers = 4)} on Unix-like
 #' systems or \code{BiocParallel::SnowParam(workers = 4)} on all platforms.
 #'
-#' @param A original association matrix
+#' @param A the original interaction matrix
 #' @param threshold The adjusted p-value threshold for KS test for
 #' non-uniformity of ranks.
 #' @param p.adjust.method Multiple testing correction method,
 #' see \link[stats]{p.adjust}.
 #' @param max.friends.n The maximal number of friends for a marker.
-#' A value $n$ means that we filter out a row if it has more
-#' than $n$ friendly columns. 1 means we look only for unique (best) friends.
+#' A value \eqn{n} means that we filter out a row if it has more than
+#' \eqn{n} friendly columns. 1 means we look only for unique (best) friends.
 #' The string \code{"all"} (the default) and \code{NULL} both mean
 #' \code{ncol(A)}, that is, do not filter markers by this parameter.
 #' @param uniform.null how the support of the uniform null is chosen, passed
@@ -33,10 +33,9 @@
 #' stage, where [best_step_fit] locates the step, so that both stages measure
 #' the row on one scale; the step model is discrete, so \code{"randomized"}
 #' reaches it as \code{"continuity"}, which names the same support.
-#' @param simulate.p.value K-S by Monte-Carlo if \code{TRUE};
-#' default is \code{FALSE}, see [stats::ks.test()].
-#' @param B number of or replicates if \code{simulate.p.value=TRUE}
-#' default is 2000, see [stats::ks.test()].
+#' @param simulate.p.value ignored: the one-sample
+#' \code{\link[stats]{ks.test}} does not use it.
+#' @param B ignored, see \code{simulate.p.value}.
 #' @param .progress if \code{TRUE}, report what the call is doing. What you see
 #' depends on the backend: a serial one draws a \code{cli} progress bar with a
 #' percentage and the elapsed time, a parallel one only names the stage it has
@@ -46,13 +45,13 @@
 #' @param BPPARAM a [BiocParallel::BiocParallelParam-class] instance that
 #' controls whether the row-wise work is run serially or in parallel. The
 #' default is \code{BiocParallel::SerialParam()}.
-#' @return \code{list}; each element represents a marker, *e.g.*,
+#' @return \code{list}; each element represents a marker, *i.e.*,
 #' a matrix row that has friend(s). Each element of the return list
 #' is also a list, one element per friend, and the 2-nd level element
 #' is an integer vector with three numbers, that are:
 #' the marker coordinate (\code{marker}),
 #' the friend coordinate (\code{friend}), and
-#' the the rank of the friend for the marker (\code{rank}).
+#' the rank of the friend for the marker (\code{rank}).
 #' So, it is list of lists of simple integer vectors, each
 #' vector represents a marker+friend pair,
 #' the inner lists enumerate friends,
@@ -91,6 +90,16 @@ friends_test_ks <- function(
     .progress = FALSE,
     BPPARAM = NULL
 ) {
+    # the one-sample ks.test() never read these two, so they are ignored here
+    # as well; they stay in the signature so that a call passing them warns
+    # instead of failing
+    if (!missing(simulate.p.value) || !missing(B)) {
+        warning(
+            "'simulate.p.value' and 'B' are ignored: ",
+            "the one-sample ks.test() does not use them."
+        )
+    }
+
     if (.progress) {
         # cli needs the bar to appear at once; put the user's setting back
         # whichever way this call ends
@@ -113,25 +122,18 @@ friends_test_ks <- function(
     # calculate the p-values for null hypothesis for all the rank rows
     adj_nunif_pval <- unlist(
         .ft_map_rows(
-            function(
-                row, i, uniform.null, max.possible.rank,
-                simulate.p.value, B
-            ) {
+            function(row, i, uniform.null, max.possible.rank) {
                 friends.test::unif_ks_test(
                     row,
                     uniform.null = uniform.null,
-                    max.possible.rank = max.possible.rank,
-                    simulate.p.value = simulate.p.value,
-                    B = B
+                    max.possible.rank = max.possible.rank
                 )
             },
             rows = all_rank_rows,
             idx = seq_along(all_rank_rows),
             MoreArgs = list(
                 uniform.null = uniform.null,
-                max.possible.rank = nrow(A),
-                simulate.p.value = simulate.p.value,
-                B = B
+                max.possible.rank = nrow(A)
             ),
             BPPARAM = BPPARAM,
             .progress = .progress,
@@ -156,10 +158,6 @@ friends_test_ks <- function(
     # the step model is discrete and has nothing to randomise; "randomized"
     # names the same support as "continuity", so it reaches the fit as that
     step.null <- if (uniform.null == "observed") "observed" else "continuity"
-    #run ut all in purrr style
-    #return: list of list of, trios
-    #i, j, r -- vectors:
-    #marker, friend, friend.rank
     marker_rank_rows <- purrr::array_branch(
         all_ranks[marker_indices, , drop = FALSE],
         1

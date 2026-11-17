@@ -12,9 +12,9 @@ test_that("best friend is determined correctly", {
             row3 0.3841037 0.3800352 0.1255551 0.86969085 0.1862176
             row4 0.7698414 0.7774452 0.2672207 0.34034900 0.8273733
             row5 0.0000000 0.0000000 0.0000000 0.00000000 1.0000000"
-    attention <- as.matrix(read.table(text = text, header = TRUE))
+    A <- as.matrix(read.table(text = text, header = TRUE))
 
-    friends <- friends_test_ks(attention)
+    friends <- friends_test_ks(A)
     expected <- list(
         row5 = list(
             col5 = c(marker = 5, friend = 5, rank = 1)
@@ -156,4 +156,27 @@ test_that("passes non-diagonal diagonal parallel test with MulticoreParam", {
         row10 = list(col10 = c(marker = 10, friend = 10, rank = 1))
     )
     expect_equivalent(friends, expected)
+})
+
+test_that("the ignored arguments warn once per call, not once per row", {
+    set.seed(3)
+    A <- matrix(rnorm(10 * 6), nrow = 10, ncol = 6)
+    rownames(A) <- paste0("row", seq_len(10))
+    colnames(A) <- paste0("col", seq_len(6))
+
+    set.seed(4)
+    w <- suppressMessages(
+        capture_warnings(friends_test_ks(A, simulate.p.value = TRUE, B = 10))
+    )
+    expect_length(w, 1L)
+    expect_match(w, "are ignored")
+
+    # the result is the one the call would have given without them
+    set.seed(4)
+    with.args <- suppressMessages(suppressWarnings(
+        friends_test_ks(A, simulate.p.value = TRUE)
+    ))
+    set.seed(4)
+    without <- suppressMessages(friends_test_ks(A))
+    expect_identical(with.args, without)
 })

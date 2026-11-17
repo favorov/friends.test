@@ -25,11 +25,12 @@ chosen. \code{"observed"} (the default) takes them from the row itself,
 scale of the ranks given.}
 }
 \value{
-a list of four values: \cr
+a list of five values: \cr
 \code{step.models} is return from \link{step_fit_ln_likelihoods} call,
-which the function starts with
-\code{best.step.rank} is the rank value that makes the best step;
-it is not obligatory one on the \code{ranks} value.\cr
+which the function starts with\cr
+\code{best.step.rank} is the rank value that makes the best step; it is a
+rank on the scale of \code{ranks} and need not be one of the ranks the row
+actually takes.\cr
 \code{columns.on.left} is
 the vector of the columns on the left of the best step
 (including the step value). They are friends of the row.\cr

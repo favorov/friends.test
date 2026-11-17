@@ -16,8 +16,8 @@ best_step_fit_bic(
 
 \item{max.possible.rank}{number of rows, i.e. maximal possible rank}
 
-\item{prior.to.have.friends}{The prior for a row is important enough to
-have friendly columns}
+\item{prior.to.have.friends}{The prior probability that a row has friendly
+columns, a number in \eqn{[0, 1]}.  It has no default and has to be given.}
 
 \item{uniform.null}{how the smallest and the largest possible rank are
 chosen. \code{"observed"} (the default) takes them from the row itself,
@@ -31,14 +31,15 @@ counterpart here, because the step model is already discrete and has
 nothing to randomise.}
 }
 \value{
-a list of four values: \cr
-\code{step.models} is the value return by \link{step_fit_ln_likelihoods}
-call the function start with
-\code{best.step.rank} is the rank value that makes the best step;
-it is not obligatory one on the \code{ranks} value.\cr
+a list of five values: \cr
+\code{step.models} is the value returned by
+\link{step_fit_ln_likelihoods}, the call this function starts with\cr
+\code{best.step.rank} is the rank value that makes the best step; it is a
+rank on the scale of \code{ranks} and need not be one of the ranks the row
+actually takes.\cr
 \code{columns.on.left} is the vector of the columns on the
 left of the best step (including the step value).
-They are friends of the row, and the row is thir marker.\cr
+They are friends of the row, and the row is their marker.\cr
 \code{columns.on.right} is vector of those on the right \cr
 \code{population.on.left} is how many (column) ranks are on left of split;
 they are friends! \cr
